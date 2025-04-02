@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="initial-scale=1, maximum-scale=1, user-scalable=no">
-  <title>Land Reform in CA Power Map</title>
+  <title>California Land Conservation Organizations Map</title>
   
   <!-- Load the ArcGIS Maps SDK for JavaScript core API -->
   <link rel="stylesheet" href="https://js.arcgis.com/4.32/esri/themes/light/main.css"/>
@@ -808,23 +808,6 @@
       return organizations;
     }
     
-    // Clear map and reload based on CSV data
-    function clearMapAndReload() {
-      // Clear existing graphics
-      if (graphicsLayer) {
-        graphicsLayer.removeAll();
-        debugLog("Cleared all map markers");
-      }
-      
-      // Reset city groups
-      cityGroups = {};
-      
-      // Process the organizations data
-      processOrganizations().catch(error => {
-        debugLog(`Error processing organizations: ${error.message}`);
-      });
-    }
-    
     // Use the AMD pattern as recommended by ArcGIS
     require([
       "esri/Map", 
@@ -1114,10 +1097,15 @@
             
             const orgItem = document.createElement("div");
             orgItem.className = "org-item";
+            
+            // Include source file if available
+            const sourceInfo = org.SourceFile ? `<div style="font-size: 0.8em; color: #666;">${org.SourceFile}</div>` : '';
+            
             orgItem.innerHTML = `
               <div class="org-name">${org.Name}</div>
               <div>${org["Total revenues"]}</div>
               <div>${org["IRS 501(c) type"] || ''}</div>
+              ${sourceInfo}
             `;
             orgsListElement.appendChild(orgItem);
           });
@@ -1427,14 +1415,51 @@
               organizations = allOrganizations;
             }
             
-            // Process all organizations and update the map
-            clearMapAndReload();
+            // Clear existing graphics
+            if (graphicsLayer) {
+              graphicsLayer.removeAll();
+              debugLog("Cleared all map markers");
+            }
+            
+            // Reset city groups
+            cityGroups = {};
+            
+            // Process the organizations data
+            await processOrganizations();
             
           } catch (error) {
             debugLog(`Error processing files: ${error.message}`);
             organizations = mockOrganizations;
-            clearMapAndReload();
+            
+            // Clear existing graphics
+            if (graphicsLayer) {
+              graphicsLayer.removeAll();
+              debugLog("Cleared all map markers");
+            }
+            
+            // Reset city groups
+            cityGroups = {};
+            
+            // Process the mock organizations data
+            await processOrganizations();
           }
+        }
+        
+        // Clear map and reload based on CSV data
+        function clearMapAndReload() {
+          // Clear existing graphics
+          if (graphicsLayer) {
+            graphicsLayer.removeAll();
+            debugLog("Cleared all map markers");
+          }
+          
+          // Reset city groups
+          cityGroups = {};
+          
+          // Process the organizations data
+          processOrganizations().catch(error => {
+            debugLog(`Error processing organizations: ${error.message}`);
+          });
         }
         
         // Add a test marker to verify the graphics layer is working
