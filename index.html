@@ -48,6 +48,32 @@
       border-radius: 8px;
       box-shadow: 0 2px 8px rgba(0,0,0,0.3);
       padding: 15px;
+      max-width: 300px;
+    }
+    
+    #categoryLegendPanel {
+      position: absolute;
+      bottom: 250px;
+      left: 20px;
+      z-index: 99;
+      background-color: white;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+      padding: 15px;
+      max-width: 300px;
+    }
+    
+    #fundingVisualization {
+      position: absolute;
+      top: 20px;
+      left: 350px;
+      z-index: 99;
+      background-color: white;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+      padding: 15px;
+      width: 400px;
+      display: none;
     }
     
     #debugPanel {
@@ -78,6 +104,13 @@
       margin-right: 10px;
     }
     
+    .category-color {
+      width: 20px;
+      height: 20px;
+      border-radius: 3px;
+      margin-right: 10px;
+    }
+    
     .filter-btn {
       margin: 5px 5px 5px 0;
       padding: 8px 12px;
@@ -92,6 +125,19 @@
       color: white;
     }
     
+    .category-filter-btn {
+      margin: 5px 5px 5px 0;
+      padding: 4px 8px;
+      border: none;
+      border-radius: 4px;
+      font-size: 0.8em;
+      cursor: pointer;
+    }
+    
+    .category-filter-btn.active {
+      color: white;
+    }
+    
     .org-item {
       border-bottom: 1px solid #eee;
       padding: 8px 0;
@@ -100,6 +146,12 @@
     .org-name {
       font-weight: bold;
       color: #0079c1;
+    }
+    
+    .org-category {
+      font-size: 0.8em;
+      color: #666;
+      font-style: italic;
     }
     
     .title-bar {
@@ -153,6 +205,36 @@
     .action-btn:hover {
       background-color: #005e95;
     }
+    
+    .viz-bar {
+      height: 30px;
+      margin-bottom: 5px;
+      position: relative;
+      border-radius: 3px;
+      overflow: hidden;
+    }
+    
+    .viz-label {
+      position: absolute;
+      left: 10px;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 0.8em;
+      font-weight: bold;
+      color: #fff;
+      text-shadow: 1px 1px 1px rgba(0,0,0,0.5);
+    }
+    
+    .viz-value {
+      position: absolute;
+      right: 10px;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 0.8em;
+      font-weight: bold;
+      color: #fff;
+      text-shadow: 1px 1px 1px rgba(0,0,0,0.5);
+    }
 
     #resetViewBtn {
       position: absolute;
@@ -179,6 +261,20 @@
       padding: 10px 15px;
       cursor: pointer;
       color: #d9534f; /* Bootstrap danger color */
+    }
+    
+    #showVisualizationBtn {
+      position: absolute;
+      left: 350px;
+      top: 20px;
+      z-index: 99;
+      background-color: #0079c1;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+      padding: 10px 15px;
+      cursor: pointer;
     }
     
     #fileUploadContainer {
@@ -282,7 +378,17 @@
     <div id="fileList"></div>
     <button id="clearFilesButton" style="display: none;">Clear All Files</button>
     <button id="fileUploadButton">Load Map Data</button>
-    <div id="fileStatus">Upload one or more CSV files to see organizations on the map.</div>
+    <div id="fileStatus">Upload the 7 CSV files to see organizations on the map.</div>
+  </div>
+  
+  <button id="showVisualizationBtn">Show Funding Visualization</button>
+  
+  <div id="fundingVisualization">
+    <div class="title-bar">
+      <h2 style="margin: 0; font-size: 1.2em;">Funding by Category</h2>
+    </div>
+    <div id="fundingBars"></div>
+    <button class="action-btn" id="hideVisualizationBtn">Close</button>
   </div>
   
   <div id="infoPanel">
@@ -307,6 +413,8 @@
       <button id="filterMed" class="filter-btn">$1-10M</button>
       <button id="filterSmall" class="filter-btn">&lt; $1M</button>
     </div>
+    
+    <div id="categoryFilters" style="margin-bottom: 15px;"></div>
     
     <div id="selectedCity" style="margin-bottom: 15px; font-weight: bold;"></div>
     <div id="orgsList" style="margin-top: 10px;"></div>
@@ -337,6 +445,11 @@
     <p style="margin-bottom: 0; font-size: 0.8em;">* Size of marker indicates funding amount</p>
   </div>
   
+  <div id="categoryLegendPanel">
+    <h3 style="margin-top: 0; margin-bottom: 10px;">Organization Categories</h3>
+    <div id="categoryLegendItems"></div>
+  </div>
+  
   <div id="debugPanel">
     <h3 style="margin-top: 0; margin-bottom: 10px;">Debug Info</h3>
     <div id="debugContent"></div>
@@ -349,6 +462,49 @@
   <script src="https://js.arcgis.com/4.32/"></script>
 
   <script>
+    // Define category information with colors
+    const categoryInfo = {
+      'growerlaborrelationsorganizations': {
+        name: 'Grower-Labor Relations',
+        color: '#FF5733' // Orange-red
+      },
+      'landconservationorganizations': {
+        name: 'Land Conservation',
+        color: '#33FF57' // Green
+      },
+      'waterconservationorganizations': {
+        name: 'Water Conservation',
+        color: '#3357FF' // Blue
+      },
+      'agriculturalorganizations': {
+        name: 'Agricultural',
+        color: '#F3FF33' // Yellow
+      },
+      'growerbusinessleagues': {
+        name: 'Grower Business Leagues',
+        color: '#FF33F3' // Pink
+      },
+      'farmworkerorganizations': {
+        name: 'Farmworker',
+        color: '#33FFF3' // Cyan
+      },
+      'environmentalismorganizations': {
+        name: 'Environmentalism',
+        color: '#A233FF' // Purple
+      }
+    };
+    
+    // File to category mapping
+    const fileToCategory = {
+      'data_growerlaborrelationsorganizations.csv': 'growerlaborrelationsorganizations',
+      'data_landconservationorganizations.csv': 'landconservationorganizations',
+      'data_waterconservationorganizations.csv': 'waterconservationorganizations',
+      'data_agriculturalorganizations.csv': 'agriculturalorganizations',
+      'data_growerbusinessleagues.csv': 'growerbusinessleagues',
+      'data_farmworkerorganizations.csv': 'farmworkerorganizations',
+      'data_environmentalismorganizations.csv': 'environmentalismorganizations'
+    };
+    
     // Debug function to log information
     function debugLog(message) {
       const debugContent = document.getElementById("debugContent");
@@ -364,6 +520,60 @@
       const fileStatus = document.getElementById("fileStatus");
       if (message.includes("organizations") || message.includes("cities") || message.includes("CSV")) {
         fileStatus.textContent = message;
+      }
+    }
+    
+    // Generate category legend
+    function generateCategoryLegend() {
+      const categoryLegendItems = document.getElementById("categoryLegendItems");
+      categoryLegendItems.innerHTML = "";
+      
+      for (const catKey in categoryInfo) {
+        const cat = categoryInfo[catKey];
+        const legendItem = document.createElement("div");
+        legendItem.className = "legend-item";
+        
+        const colorBox = document.createElement("div");
+        colorBox.className = "category-color";
+        colorBox.style.backgroundColor = cat.color;
+        
+        const nameLabel = document.createElement("div");
+        nameLabel.textContent = cat.name;
+        
+        legendItem.appendChild(colorBox);
+        legendItem.appendChild(nameLabel);
+        categoryLegendItems.appendChild(legendItem);
+      }
+    }
+    
+    // Generate category filter buttons
+    function generateCategoryFilters() {
+      const categoryFilters = document.getElementById("categoryFilters");
+      categoryFilters.innerHTML = "";
+      
+      const allCatButton = document.createElement("button");
+      allCatButton.id = "filterCatAll";
+      allCatButton.className = "category-filter-btn active";
+      allCatButton.style.backgroundColor = "#666";
+      allCatButton.textContent = "All Categories";
+      allCatButton.onclick = function() {
+        filterByCategory('all');
+        setActiveCategoryButton(this);
+      };
+      categoryFilters.appendChild(allCatButton);
+      
+      for (const catKey in categoryInfo) {
+        const cat = categoryInfo[catKey];
+        const button = document.createElement("button");
+        button.id = `filterCat${catKey}`;
+        button.className = "category-filter-btn";
+        button.style.backgroundColor = cat.color;
+        button.textContent = cat.name;
+        button.onclick = function() {
+          filterByCategory(catKey);
+          setActiveCategoryButton(this);
+        };
+        categoryFilters.appendChild(button);
       }
     }
     
@@ -465,11 +675,175 @@
       "Weaverville": [-122.9417, 40.7310],
       "Quincy": [-120.9477, 39.9374],
       "Placerville": [-120.7983, 38.7296],
-      "Susanville": [-120.6530, 40.4163]
+      "Susanville": [-120.6530, 40.4163],
+      "Kelseyville": [-122.8386, 38.9779],
+      "Richmond": [-122.3477, 37.9358],
+      "Concord": [-122.0311, 37.9783],
+      "Lincoln": [-121.2930, 38.8915],
+      "Walnut Creek": [-122.0651, 37.9101],
+      "Shafter": [-119.2688, 35.5008],
+      "Redwood City": [-122.2364, 37.4852]
     };
+    
+    // Global variables
+    let view;
+    let graphicsLayer;
+    let categoryGraphicsLayers = {}; // Separate layer for each category
+    let organizations = [];
+    let cityGroups = {};
+    let currentFilter = 'all';
+    let currentCategoryFilter = 'all';
+    let selectedCity = null;
+    let geocodeCache = {}; // Added geocodeCache as a global variable
+    let uploadedFiles = []; // Array to store uploaded file data
+    let categoryStats = {}; // Statistics for each category
     
     // Load geocode cache from localStorage with improved error handling
     let storedGeoCache = {};
+    
+    // Function to update funding visualization
+    function updateFundingVisualization() {
+      const fundingBars = document.getElementById("fundingBars");
+      fundingBars.innerHTML = "";
+      
+      // Calculate total funding
+      let totalFunding = 0;
+      Object.values(categoryStats).forEach(stat => {
+        totalFunding += stat.totalRevenue;
+      });
+      
+      // Sort categories by funding amount (descending)
+      const sortedCategories = Object.keys(categoryStats).sort((a, b) => 
+        categoryStats[b].totalRevenue - categoryStats[a].totalRevenue
+      );
+      
+      // Create bars for each category
+      sortedCategories.forEach(catKey => {
+        if (!categoryStats[catKey]) return;
+        
+        const catInfo = categoryInfo[catKey];
+        const stats = categoryStats[catKey];
+        const percentage = totalFunding > 0 ? (stats.totalRevenue / totalFunding) * 100 : 0;
+        
+        const barContainer = document.createElement("div");
+        barContainer.style.marginBottom = "15px";
+        
+        const barLabel = document.createElement("div");
+        barLabel.style.marginBottom = "3px";
+        barLabel.style.display = "flex";
+        barLabel.style.justifyContent = "space-between";
+        
+        const nameSpan = document.createElement("span");
+        nameSpan.textContent = catInfo.name;
+        nameSpan.style.fontWeight = "bold";
+        
+        const valueSpan = document.createElement("span");
+        valueSpan.textContent = `$${(stats.totalRevenue / 1000000).toFixed(1)}M (${percentage.toFixed(1)}%)`;
+        
+        barLabel.appendChild(nameSpan);
+        barLabel.appendChild(valueSpan);
+        
+        const barEl = document.createElement("div");
+        barEl.className = "viz-bar";
+        barEl.style.width = "100%";
+        barEl.style.backgroundColor = catInfo.color;
+        
+        const countLabel = document.createElement("div");
+        countLabel.textContent = `${stats.count} orgs`;
+        countLabel.className = "viz-label";
+        
+        barEl.appendChild(countLabel);
+        
+        barContainer.appendChild(barLabel);
+        barContainer.appendChild(barEl);
+        
+        fundingBars.appendChild(barContainer);
+      });
+    }
+    
+    // Function to filter graphics by category
+    function filterByCategory(category) {
+      currentCategoryFilter = category;
+      
+      if (category === 'all') {
+        // Show all categories
+        Object.keys(categoryGraphicsLayers).forEach(catKey => {
+          categoryGraphicsLayers[catKey].visible = true;
+        });
+      } else {
+        // Show only selected category
+        Object.keys(categoryGraphicsLayers).forEach(catKey => {
+          categoryGraphicsLayers[catKey].visible = (catKey === category);
+        });
+      }
+      
+      // Update info panel
+      updateInfoPanel(selectedCity);
+    }
+    
+    // Helper function to set active category filter button
+    function setActiveCategoryButton(button) {
+      const buttons = document.querySelectorAll(".category-filter-btn");
+      buttons.forEach(btn => {
+        btn.classList.remove("active");
+      });
+      button.classList.add("active");
+    }
+    
+    // Function to determine organization category from filename
+    function getCategoryFromFilename(filename) {
+      return fileToCategory[filename] || 'unknown';
+    }
+    
+    // Function to get a friendly category name
+    function getCategoryName(categoryKey) {
+      return categoryInfo[categoryKey]?.name || categoryKey;
+    }
+    
+    // Function to get category color
+    function getCategoryColor(categoryKey) {
+      return categoryInfo[categoryKey]?.color || '#999999';
+    }
+    
+    // Function to render the list of uploaded files
+    function renderFileList() {
+      const fileListElement = document.getElementById("fileList");
+      fileListElement.innerHTML = "";
+      
+      if (uploadedFiles.length === 0) {
+        fileListElement.style.display = "none";
+        document.getElementById("clearFilesButton").style.display = "none";
+        return;
+      }
+      
+      fileListElement.style.display = "block";
+      document.getElementById("clearFilesButton").style.display = "block";
+      
+      uploadedFiles.forEach((file, index) => {
+        const fileItem = document.createElement("div");
+        fileItem.className = "file-item";
+        
+        const fileName = document.createElement("div");
+        fileName.className = "file-name";
+        fileName.textContent = file.name;
+        fileItem.appendChild(fileName);
+        
+        const removeButton = document.createElement("span");
+        removeButton.className = "file-action";
+        removeButton.textContent = "×";
+        removeButton.title = "Remove file";
+        removeButton.onclick = function(e) {
+          e.stopPropagation();
+          uploadedFiles.splice(index, 1);
+          renderFileList();
+        };
+        fileItem.appendChild(removeButton);
+        
+        fileListElement.appendChild(fileItem);
+      });
+    }
+    
+    // Function to try loading geocode cache from localStorage
     try {
       debugLog("Attempting to load geocode cache from localStorage...");
       const cachedCoordinates = localStorage.getItem('landConservationMapGeoCache');
@@ -505,100 +879,6 @@
       debugLog(`Error accessing localStorage: ${e.message}`);
     }
     
-    // Fallback data if CSV load fails
-    const mockOrganizations = [
-      {
-        "Name": "The Nature Conservancy",
-        "EIN": "53-0242652",
-        "IRS 501(c) type": "501(c)(3)",
-        "City": "San Francisco",
-        "State": "CA",
-        "Total revenues": "$34,144,676"
-      },
-      {
-        "Name": "California Rangeland Trust",
-        "EIN": "31-1631453",
-        "IRS 501(c) type": "501(c)(3)",
-        "City": "Sacramento",
-        "State": "CA",
-        "Total revenues": "$7,705,233"
-      },
-      {
-        "Name": "Peninsula Open Space Trust",
-        "EIN": "94-2392007",
-        "IRS 501(c) type": "501(c)(3)",
-        "City": "Palo Alto",
-        "State": "CA",
-        "Total revenues": "$22,083,620"
-      },
-      {
-        "Name": "Save the Redwoods League",
-        "EIN": "94-0843915",
-        "IRS 501(c) type": "501(c)(3)",
-        "City": "San Francisco",
-        "State": "CA",
-        "Total revenues": "$15,869,688"
-      },
-      {
-        "Name": "Trust for Public Land",
-        "EIN": "23-7222333",
-        "IRS 501(c) type": "501(c)(3)",
-        "City": "San Francisco",
-        "State": "CA",
-        "Total revenues": "$13,876,543"
-      },
-      {
-        "Name": "Sierra Foothill Conservancy",
-        "EIN": "77-0343852",
-        "IRS 501(c) type": "501(c)(3)",
-        "City": "Fresno",
-        "State": "CA",
-        "Total revenues": "$2,450,000"
-      },
-      {
-        "Name": "California State Parks Foundation",
-        "EIN": "94-1707583",
-        "IRS 501(c) type": "501(c)(3)",
-        "City": "Los Angeles",
-        "State": "CA",
-        "Total revenues": "$8,250,000"
-      },
-      {
-        "Name": "Sempervirens Fund",
-        "EIN": "94-2155097",
-        "IRS 501(c) type": "501(c)(3)",
-        "City": "Felton",
-        "State": "CA",
-        "Total revenues": "$4,780,450"
-      },
-      {
-        "Name": "Mojave Desert Land Trust",
-        "EIN": "20-4734958",
-        "IRS 501(c) type": "501(c)(3)",
-        "City": "Joshua Tree",
-        "State": "CA",
-        "Total revenues": "$1,950,000"
-      },
-      {
-        "Name": "Land Trust of Santa Cruz County",
-        "EIN": "94-2656227",
-        "IRS 501(c) type": "501(c)(3)",
-        "City": "Santa Cruz",
-        "State": "CA",
-        "Total revenues": "$3,500,000"
-      }
-    ];
-    
-    // Global variables
-    let view;
-    let graphicsLayer;
-    let organizations = [];
-    let cityGroups = {};
-    let currentFilter = 'all';
-    let selectedCity = null;
-    let geocodeCache = {}; // Added geocodeCache as a global variable
-    let uploadedFiles = []; // Array to store uploaded file data
-    
     // Function to reset the geocode cache
     function resetGeocodeCache() {
       try {
@@ -621,30 +901,7 @@
       );
     }
     
-    // Function to bulk clear existing invalid coordinates
-    function cleanupInvalidCachedCoordinates() {
-      let removedCount = 0;
-      
-      debugLog("Checking cached coordinates for validity...");
-      
-      for (const city in geocodeCache) {
-        const coords = geocodeCache[city];
-        if (!isValidCaliforniaCoordinate(coords)) {
-          debugLog(`Removing invalid coordinates for ${city}: [${coords}]`);
-          delete geocodeCache[city];
-          removedCount++;
-        }
-      }
-      
-      if (removedCount > 0) {
-        debugLog(`Removed ${removedCount} invalid coordinates from cache`);
-        saveGeocodeCache();
-      } else {
-        debugLog("No invalid coordinates found in cache");
-      }
-    }
-    
-    // Function to save geocode cache to localStorage with improved error handling
+    // Function to save geocode cache to localStorage
     function saveGeocodeCache() {
       try {
         // Only save if we actually have coordinates to save
@@ -655,7 +912,6 @@
           // Sanity check the size (localStorage has limits)
           if (cacheJson.length > 5000000) {
             debugLog("WARNING: Geocode cache too large for localStorage, trimming...");
-            // If needed, implement trimming logic here
           }
           
           // Save to localStorage
@@ -678,11 +934,11 @@
     // Function to format revenue for display
     function formatRevenue(value) {
       if (value >= 1000000) {
-        return `$${(value / 1000000).toFixed(1)}M`;
+        return `${(value / 1000000).toFixed(1)}M`;
       } else if (value >= 1000) {
-        return `$${(value / 1000).toFixed(1)}K`;
+        return `${(value / 1000).toFixed(1)}K`;
       }
-      return `$${value}`;
+      return `${value}`;
     }
     
     // Get marker size based on revenue
@@ -694,959 +950,547 @@
       return 10;
     }
     
-    // Get marker color based on revenue
-    function getMarkerColor(revenue) {
-      if (revenue > 20000000) return [204, 0, 0, 0.8];
-      if (revenue > 10000000) return [255, 0, 0, 0.8];
-      if (revenue > 5000000) return [255, 153, 0, 0.8];
-      if (revenue > 1000000) return [255, 204, 0, 0.8];
-      return [76, 175, 80, 0.8];
-    }
-    
-    // Function to inspect CSV headers
-    function inspectCsvHeaders(csvData) {
-      try {
-        // Parse just the first row to get headers
-        const headerResult = Papa.parse(csvData, {
-          preview: 1, // Read only first row
-          header: false
-        });
-        
-        if (headerResult.data && headerResult.data[0]) {
-          debugLog(`CSV Headers: ${headerResult.data[0].join(', ')}`);
-          
-          // Check for common header variations that might be issues
-          const headers = headerResult.data[0];
-          const expectedHeaders = ["Name", "City", "State", "Total revenues"];
-          
-          const foundHeaders = expectedHeaders.map(header => {
-            const exactMatch = headers.includes(header);
-            if (exactMatch) return `"${header}" (✓)`;
-            
-            // Look for close matches that might be causing issues
-            const closeMatches = headers.filter(h => 
-              h.toLowerCase().includes(header.toLowerCase()) || 
-              header.toLowerCase().includes(h.toLowerCase())
-            );
-            
-            if (closeMatches.length > 0) {
-              return `"${header}" (close matches: ${closeMatches.join(', ')})`;
-            }
-            
-            return `"${header}" (❌)`;
-          });
-          
-          debugLog(`Expected headers status: ${foundHeaders.join('; ')}`);
-        } else {
-          debugLog("Failed to parse CSV headers");
-        }
-      } catch (e) {
-        debugLog(`Error inspecting CSV headers: ${e.message}`);
-      }
-    }
-    
-    // Function to validate and fix organization data
-    function validateAndFixOrganizationData(organizations) {
-      if (!organizations || organizations.length === 0) {
-        debugLog("No organizations data to validate");
-        return organizations;
-      }
+    // Get marker color based on revenue and category
+    function getMarkerColor(revenue, category) {
+      // Use category color with different opacity based on revenue
+      const categoryColor = getCategoryColor(category);
       
-      // Get all column names from the first row
-      const sampleOrg = organizations[0];
-      const columnNames = Object.keys(sampleOrg);
-      debugLog(`CSV column names: ${columnNames.join(', ')}`);
-      
-      // Check for alternate column names for required fields
-      const columnMappings = {
-        "Name": ["name", "organization", "organization name", "org name", "organization_name"],
-        "City": ["city", "location", "town", "municipality"],
-        "State": ["state", "province", "st", "region"],
-        "Total revenues": ["total revenues", "revenues", "total_revenues", "revenue", "funding", "total funding"]
+      // Convert hex to RGB with opacity
+      const hexToRgba = (hex, opacity) => {
+        let r = parseInt(hex.slice(1, 3), 16);
+        let g = parseInt(hex.slice(3, 5), 16);
+        let b = parseInt(hex.slice(5, 7), 16);
+        return [r, g, b, opacity];
       };
       
-      // Check if we need to rename columns
-      let needsRenaming = false;
-      const renamedFields = {};
-      
-      Object.keys(columnMappings).forEach(standardName => {
-        if (!columnNames.includes(standardName)) {
-          // Standard name not found, look for alternatives
-          const alternates = columnMappings[standardName];
-          const foundAlternate = alternates.find(alt => 
-            columnNames.find(col => col.toLowerCase() === alt.toLowerCase())
-          );
-          
-          if (foundAlternate) {
-            const exactColumn = columnNames.find(col => 
-              col.toLowerCase() === foundAlternate.toLowerCase()
-            );
-            renamedFields[exactColumn] = standardName;
-            needsRenaming = true;
-            debugLog(`Will rename column "${exactColumn}" to "${standardName}"`);
-          } else {
-            debugLog(`WARNING: Could not find any column for "${standardName}"`);
-          }
-        }
-      });
-      
-      // If renaming is needed, create a new array with fixed column names
-      if (needsRenaming) {
-        debugLog("Renaming columns to standard format");
-        return organizations.map(org => {
-          const newOrg = {...org};
-          
-          Object.keys(renamedFields).forEach(oldName => {
-            const newName = renamedFields[oldName];
-            newOrg[newName] = org[oldName];
-          });
-          
-          return newOrg;
-        });
-      }
-      
-      return organizations;
+      // Apply different opacity based on revenue
+      if (revenue > 20000000) return hexToRgba(categoryColor, 1.0);
+      if (revenue > 10000000) return hexToRgba(categoryColor, 0.9);
+      if (revenue > 5000000) return hexToRgba(categoryColor, 0.8);
+      if (revenue > 1000000) return hexToRgba(categoryColor, 0.7);
+      return hexToRgba(categoryColor, 0.6);
     }
     
-    // Use the AMD pattern as recommended by ArcGIS
-    require([
-      "esri/Map", 
-      "esri/views/MapView",
-      "esri/Graphic",
-      "esri/layers/GraphicsLayer",
-      "esri/geometry/Point",
-      "esri/widgets/BasemapToggle",
-      "esri/widgets/Home",
-      "esri/geometry/Extent",
-      "esri/request"
-    ], (ArcGISMap, MapView, Graphic, GraphicsLayer, Point, BasemapToggle, Home, Extent, esriRequest) => {
-      debugLog("ArcGIS modules loaded successfully");
-      
+    // Function to update info panel with organizations data
+    // Enhanced processOrganizations function with improved debugging
+    async function processOrganizations() {
       try {
-        // Initialize the geocodeCache with combined data
-        geocodeCache = {...cityCoordinates, ...storedGeoCache};
+        // Reset category statistics
+        categoryStats = {};
         
-        // Updated geocodeCity function using fetch with Nominatim API
-        async function geocodeCity(cityName, state = "CA") {
-          // Check cache first
-          if (geocodeCache[cityName]) {
-            // Validate cached coordinates
-            const coords = geocodeCache[cityName];
-            if (isValidCaliforniaCoordinate(coords)) {
-              debugLog(`Using cached coordinates for ${cityName}: [${coords}]`);
-              return coords;
-            } else {
-              debugLog(`Found invalid cached coordinates for ${cityName}: [${coords}], re-geocoding`);
-              // If invalid, continue to geocode
+        // Group organizations by city
+        cityGroups = {};
+        let totalRevenue = 0;
+        let caOrgCount = 0;
+        
+        debugLog(`Processing ${organizations.length} organizations...`);
+        
+        // Check if organizations is valid
+        if (!Array.isArray(organizations)) {
+          debugLog(`ERROR: organizations is not an array. Type: ${typeof organizations}`);
+          if (typeof organizations === 'object') {
+            debugLog(`organizations keys: ${Object.keys(organizations).join(', ')}`);
+          }
+          return;
+        }
+        
+        // First pass: determine category for each organization
+        organizations.forEach((org, index) => {
+          // If organization doesn't already have a category, determine it from source file
+          if (!org.category && org.SourceFile) {
+            org.category = getCategoryFromFilename(org.SourceFile);
+          }
+          
+          // If still no category, use 'unknown'
+          if (!org.category) {
+            org.category = 'unknown';
+          }
+          
+          // Initialize category stats if needed
+          if (!categoryStats[org.category]) {
+            categoryStats[org.category] = {
+              count: 0,
+              totalRevenue: 0
+            };
+          }
+        });
+        
+        // Second pass: process organizations by city and update category stats
+        organizations.forEach((org, index) => {
+          // Check if organization has valid data
+          if (!org || !org.City || !org.State) {
+            debugLog(`Skipping invalid organization at index ${index}: ${JSON.stringify(org)}`);
+            return;
+          }
+          
+          if (org.State === 'CA') {
+            const city = org.City.trim();
+            const revenue = parseRevenue(org["Total revenues"]);
+            const category = org.category;
+            
+            if (isNaN(revenue)) {
+              debugLog(`Warning: Invalid revenue format for ${org.Name}: "${org["Total revenues"]}"`);
+            }
+            
+            // Update counters
+            caOrgCount++;
+            totalRevenue += revenue;
+            
+            // Update category statistics
+            categoryStats[category].count++;
+            categoryStats[category].totalRevenue += revenue;
+            
+            if (index < 5 || index > organizations.length - 6) {
+              // Log a few at the beginning and end to avoid flooding
+              debugLog(`Processing org in ${city}: ${org.Name} (${getCategoryName(category)}) - ${org["Total revenues"]}`);
+            } else if (index === 5 && organizations.length > 10) {
+              debugLog(`... (${organizations.length - 10} more organizations) ...`);
+            }
+            
+            if (!cityGroups[city]) {
+              cityGroups[city] = {
+                city: city,
+                count: 0,
+                totalRevenue: 0,
+                organizations: []
+              };
+            }
+            
+            cityGroups[city].count++;
+            cityGroups[city].totalRevenue += revenue;
+            cityGroups[city].organizations.push(org);
+          }
+        });
+        
+        // Update statistics
+        document.getElementById("orgCount").textContent = caOrgCount;
+        document.getElementById("fundingTotal").textContent = formatRevenue(totalRevenue);
+        
+        debugLog(`Found ${caOrgCount} organizations in California with total revenue of ${formatRevenue(totalRevenue)}`);
+        debugLog(`Number of cities: ${Object.keys(cityGroups).length}`);
+        
+        // Log category statistics
+        debugLog("\nCategory statistics:");
+        for (const category in categoryStats) {
+          const stats = categoryStats[category];
+          debugLog(`${getCategoryName(category)}: ${stats.count} organizations, ${formatRevenue(stats.totalRevenue)} revenue`);
+        }
+        
+        // Update funding visualization
+        updateFundingVisualization();
+        
+        // Create markers for each city
+        const cities = Object.keys(cityGroups);
+        
+        debugLog(`Starting to create markers for ${cities.length} cities...`);
+        
+        // Process cities with a delay to avoid rate limiting
+        let markersCreated = 0;
+        
+        // Clear existing graphics in all layers
+        graphicsLayer.removeAll();
+        Object.values(categoryGraphicsLayers).forEach(layer => layer.removeAll());
+        
+        for (let i = 0; i < cities.length; i++) {
+          const city = cities[i];
+          const cityInfo = cityGroups[city];
+          
+          if (i < 3 || i > cities.length - 4) {
+            // Log only a few cities to avoid flooding debug panel
+            debugLog(`Processing city ${i+1}/${cities.length}: ${city} with ${cityInfo.count} organizations and ${formatRevenue(cityInfo.totalRevenue)} revenue`);
+          } else if (i === 3 && cities.length > 6) {
+            debugLog(`... (${cities.length - 6} more cities) ...`);
+          }
+          
+          // Get coordinates (from cache or geocoding)
+          let coordinates;
+          
+          if (geocodeCache[city]) {
+            coordinates = geocodeCache[city];
+            // Only log a few to avoid flooding
+            if (i < 3 || i > cities.length - 4) {
+              debugLog(`Using cached coordinates for ${city}: [${coordinates}]`);
+            }
+          } else {
+            debugLog(`No cached coordinates for ${city}, attempting geocoding...`);
+            coordinates = await geocodeCity(city);
+            // Add small delay between geocoding requests
+            if (i < cities.length - 1) {
+              await new Promise(resolve => setTimeout(resolve, 100));
             }
           }
           
-          debugLog(`Geocoding city: ${cityName}, ${state}`);
-          
-          try {
-            // Use OpenStreetMap's Nominatim service
-            const encodedCity = encodeURIComponent(cityName);
-            const encodedState = encodeURIComponent(state);
+          if (coordinates) {
+            const [longitude, latitude] = coordinates;
             
-            const url = `https://nominatim.openstreetmap.org/search?city=${encodedCity}&state=${encodedState}&country=USA&format=json`;
-            
-            // Important: Add a small delay to respect rate limits
-            await new Promise(resolve => setTimeout(resolve, 1000));
-            
-            const response = await fetch(url, {
-              headers: {
-                // It's good practice to add a user agent when using Nominatim
-                'User-Agent': 'CaliforniaLandConservationMap/1.0'
-              }
+            // Create point
+            const point = new Point({
+              longitude: longitude,
+              latitude: latitude
             });
             
-            if (!response.ok) {
-              throw new Error(`HTTP error! status: ${response.status}`);
-            }
-            
-            const data = await response.json();
-            
-            if (data && data.length > 0) {
-              // Get longitude and latitude from first result
-              const coords = [parseFloat(data[0].lon), parseFloat(data[0].lat)];
-              
-              // Validate coordinates to make sure they're in California
-              if (isValidCaliforniaCoordinate(coords)) {
-                debugLog(`Successfully geocoded ${cityName}: [${coords}]`);
-                
-                // Save to cache
-                geocodeCache[cityName] = coords;
-                saveGeocodeCache();
-                
-                return coords;
-              } else {
-                debugLog(`Nominatim returned coordinates outside California for ${cityName}: [${coords}]`);
-                return null;
-              }
-            } else {
-              debugLog(`No geocoding results for: ${cityName}, ${state}`);
-              
-              // Fallback to hardcoded coordinates if available
-              if (cityCoordinates[cityName]) {
-                debugLog(`Using fallback hardcoded coordinates for ${cityName}`);
-                return cityCoordinates[cityName];
+            // Group organizations by category for this city
+            const cityCategories = {};
+            cityInfo.organizations.forEach(org => {
+              if (!cityCategories[org.category]) {
+                cityCategories[org.category] = {
+                  count: 0,
+                  totalRevenue: 0,
+                  orgs: []
+                };
               }
               
-              return null;
-            }
-          } catch (error) {
-            debugLog(`Geocoding error for ${cityName}: ${error.message}`);
+              const revenue = parseRevenue(org["Total revenues"]);
+              cityCategories[org.category].count++;
+              cityCategories[org.category].totalRevenue += revenue;
+              cityCategories[org.category].orgs.push(org);
+            });
             
-            // Fallback to hardcoded coordinates if available
-            if (cityCoordinates[cityName]) {
-              debugLog(`Using fallback hardcoded coordinates for ${cityName} after error`);
-              return cityCoordinates[cityName];
-            }
-            
-            return null;
-          }
-        }
-        
-        // Create map with basemap
-        const map = new ArcGISMap({
-          basemap: "topo-vector"
-        });
-        
-        // Create graphics layer for organizations with explicit visibility settings
-        graphicsLayer = new GraphicsLayer({
-          visible: true,  // Explicitly set to visible
-          opacity: 1,     // Full opacity
-          title: "Organizations"  // Give it a title for easier identification
-        });
-        
-        // Add it to the map and ensure it's added successfully
-        map.add(graphicsLayer);
-        debugLog(`Added graphics layer to map: ${graphicsLayer.id}`);
-        
-        // Create the map view
-        view = new MapView({
-          container: "viewDiv",
-          map: map,
-          center: [-119.4179, 36.7783], // Center on California
-          zoom: 6
-        });
-        
-        // Add basemap toggle
-        const basemapToggle = new BasemapToggle({
-          view: view,
-          nextBasemap: "satellite"
-        });
-        view.ui.add(basemapToggle, "bottom-right");
-        
-        // Define California extent
-        const caExtent = new Extent({
-          xmin: -124.4096,
-          ymin: 32.5343,
-          xmax: -114.1308,
-          ymax: 42.0095,
-          spatialReference: {
-            wkid: 4326
-          }
-        });
-        
-        // Add home widget
-        const homeWidget = new Home({
-          view: view,
-          viewpoint: {
-            targetGeometry: caExtent
-          }
-        });
-        view.ui.add(homeWidget, "top-left");
-        
-        // Create a popup template for marker clicks
-        const popupTemplate = {
-          title: "{city}",
-          content: [
-            {
-              type: "text",
-              text: "{count} organizations with total funding of {totalRevenueDisplay}"
-            }
-          ]
-        };
-        
-        // Function to check graphics layer visibility
-        function checkGraphicsLayerVisibility() {
-          debugLog("Checking graphics layer visibility...");
-          
-          // Check if the layer exists
-          if (!graphicsLayer) {
-            debugLog("ERROR: Graphics layer is not defined");
-            return false;
-          }
-          
-          // Check visibility property
-          debugLog(`Graphics layer visibility: ${graphicsLayer.visible}`);
-          
-          // Check if it has any graphics
-          debugLog(`Graphics layer has ${graphicsLayer.graphics.length} graphics`);
-          
-          // Check if it's in the map's layers
-          const isInMap = map.layers.some(layer => layer === graphicsLayer);
-          debugLog(`Graphics layer is ${isInMap ? '' : 'NOT '} in the map`);
-          
-          // Ensure it's visible and in the map
-          if (!graphicsLayer.visible) {
-            debugLog("Setting graphics layer to visible");
-            graphicsLayer.visible = true;
-          }
-          
-          if (!isInMap) {
-            debugLog("Re-adding graphics layer to map");
-            map.add(graphicsLayer);
-          }
-          
-          return true;
-        }
-        
-        // Function to filter graphics based on revenue
-        function filterGraphics(minRevenue, maxRevenue = Infinity) {
-          graphicsLayer.graphics.forEach(graphic => {
-            const totalRevenue = graphic.attributes.totalRevenue;
-            if (totalRevenue >= minRevenue && totalRevenue < maxRevenue) {
-              graphic.visible = true;
-            } else {
-              graphic.visible = false;
-            }
-          });
-        }
-        
-        // Function to update info panel with organizations data
-        function updateInfoPanel(cityName = null) {
-          const orgsListElement = document.getElementById("orgsList");
-          orgsListElement.innerHTML = "";
-          
-          let displayOrgs = [];
-          
-          if (cityName) {
-            // Selected city view
-            document.getElementById("selectedCity").textContent = `${cityName}, CA`;
-            displayOrgs = organizations.filter(org => org.City === cityName);
-            
-            // Add back button
-            const backButton = document.createElement("button");
-            backButton.textContent = "Back to All Cities";
-            backButton.className = "action-btn";
-            backButton.onclick = function() {
-              selectedCity = null;
-              updateInfoPanel();
-              view.goTo(caExtent);
-            };
-            orgsListElement.appendChild(backButton);
-          } else {
-            // All cities view
-            document.getElementById("selectedCity").textContent = "";
-            
-            // Group by city and create city list
-            for (const city in cityGroups) {
-              const cityInfo = cityGroups[city];
+            // Create marker for each category in the city
+            for (const category in cityCategories) {
+              const catInfo = cityCategories[category];
               
-              // Apply revenue filter
-              if (currentFilter === 'small' && cityInfo.totalRevenue >= 1000000) continue;
-              if (currentFilter === 'med' && (cityInfo.totalRevenue < 1000000 || cityInfo.totalRevenue >= 10000000)) continue;
-              if (currentFilter === 'large' && cityInfo.totalRevenue < 10000000) continue;
-              
-              const cityItem = document.createElement("div");
-              cityItem.className = "org-item";
-              cityItem.innerHTML = `
-                <div class="org-name">${city}</div>
-                <div>${cityInfo.count} organizations</div>
-                <div>${formatRevenue(cityInfo.totalRevenue)}</div>
-              `;
-              
-              // Add click event to show city detail
-              cityItem.style.cursor = "pointer";
-              cityItem.onclick = function() {
-                selectedCity = city;
-                updateInfoPanel(city);
-                
-                // Zoom to city
-                if (geocodeCache[city]) {
-                  const point = new Point({
-                    longitude: geocodeCache[city][0],
-                    latitude: geocodeCache[city][1]
-                  });
-                  view.goTo({
-                    target: point,
-                    zoom: 10
-                  });
+              // Create marker symbol
+              const markerSymbol = {
+                type: "simple-marker",
+                size: getMarkerSize(catInfo.totalRevenue),
+                color: getMarkerColor(catInfo.totalRevenue, category),
+                outline: {
+                  color: [255, 255, 255],
+                  width: 1
                 }
               };
               
-              orgsListElement.appendChild(cityItem);
-            }
-            
-            return;
-          }
-          
-          // Sort organizations by revenue
-          displayOrgs.sort((a, b) => parseRevenue(b["Total revenues"]) - parseRevenue(a["Total revenues"]));
-          
-          // Display organizations for selected city
-          displayOrgs.forEach(org => {
-            const revenue = parseRevenue(org["Total revenues"]);
-            
-            // Apply revenue filter
-            if (currentFilter === 'small' && revenue >= 1000000) return;
-            if (currentFilter === 'med' && (revenue < 1000000 || revenue >= 10000000)) return;
-            if (currentFilter === 'large' && revenue < 10000000) return;
-            
-            const orgItem = document.createElement("div");
-            orgItem.className = "org-item";
-            
-            // Include source file if available
-            const sourceInfo = org.SourceFile ? `<div style="font-size: 0.8em; color: #666;">${org.SourceFile}</div>` : '';
-            
-            orgItem.innerHTML = `
-              <div class="org-name">${org.Name}</div>
-              <div>${org["Total revenues"]}</div>
-              <div>${org["IRS 501(c) type"] || ''}</div>
-              ${sourceInfo}
-            `;
-            orgsListElement.appendChild(orgItem);
-          });
-        }
-        
-        // Enhanced processOrganizations function with improved debugging
-        async function processOrganizations() {
-          try {
-            // Group organizations by city
-            cityGroups = {};
-            let totalRevenue = 0;
-            let caOrgCount = 0;
-            
-            debugLog(`Processing ${organizations.length} organizations...`);
-            
-            // Check if organizations is valid
-            if (!Array.isArray(organizations)) {
-              debugLog(`ERROR: organizations is not an array. Type: ${typeof organizations}`);
-              if (typeof organizations === 'object') {
-                debugLog(`organizations keys: ${Object.keys(organizations).join(', ')}`);
-              }
-              return;
-            }
-            
-            organizations.forEach((org, index) => {
-              // Check if organization has valid data
-              if (!org || !org.City || !org.State) {
-                debugLog(`Skipping invalid organization at index ${index}: ${JSON.stringify(org)}`);
-                return;
-              }
-              
-              if (org.State === 'CA') {
-                const city = org.City.trim();
-                const revenue = parseRevenue(org["Total revenues"]);
-                
-                if (isNaN(revenue)) {
-                  debugLog(`Warning: Invalid revenue format for ${org.Name}: "${org["Total revenues"]}"`);
-                }
-                
-                caOrgCount++;
-                totalRevenue += revenue;
-                
-                if (index < 5 || index > organizations.length - 6) {
-                  // Log a few at the beginning and end to avoid flooding
-                  debugLog(`Processing org in ${city}: ${org.Name} - ${org["Total revenues"]}`);
-                } else if (index === 5 && organizations.length > 10) {
-                  debugLog(`... (${organizations.length - 10} more organizations) ...`);
-                }
-                
-                if (!cityGroups[city]) {
-                  cityGroups[city] = {
+              try {
+                // Create graphic
+                const graphic = new Graphic({
+                  geometry: point,
+                  symbol: markerSymbol,
+                  attributes: {
                     city: city,
-                    count: 0,
-                    totalRevenue: 0,
-                    organizations: []
-                  };
-                }
-                
-                cityGroups[city].count++;
-                cityGroups[city].totalRevenue += revenue;
-                cityGroups[city].organizations.push(org);
-              }
-            });
-            
-            // Update statistics
-            document.getElementById("orgCount").textContent = caOrgCount;
-            document.getElementById("fundingTotal").textContent = formatRevenue(totalRevenue);
-            
-            debugLog(`Found ${caOrgCount} organizations in California with total revenue of ${formatRevenue(totalRevenue)}`);
-            debugLog(`Number of cities: ${Object.keys(cityGroups).length}`);
-            
-            // Create markers for each city
-            const cities = Object.keys(cityGroups);
-            
-            debugLog(`Starting to create markers for ${cities.length} cities...`);
-            
-            // Process cities with a delay to avoid rate limiting
-            let markersCreated = 0;
-            
-            for (let i = 0; i < cities.length; i++) {
-              const city = cities[i];
-              const cityInfo = cityGroups[city];
-              
-              if (i < 3 || i > cities.length - 4) {
-                // Log only a few cities to avoid flooding debug panel
-                debugLog(`Processing city ${i+1}/${cities.length}: ${city} with ${cityInfo.count} organizations and ${formatRevenue(cityInfo.totalRevenue)} revenue`);
-              } else if (i === 3 && cities.length > 6) {
-                debugLog(`... (${cities.length - 6} more cities) ...`);
-              }
-              
-              // Get coordinates (from cache or geocoding)
-              let coordinates;
-              
-              if (geocodeCache[city]) {
-                coordinates = geocodeCache[city];
-                // Only log a few to avoid flooding
-                if (i < 3 || i > cities.length - 4) {
-                  debugLog(`Using cached coordinates for ${city}: [${coordinates}]`);
-                }
-              } else {
-                debugLog(`No cached coordinates for ${city}, attempting geocoding...`);
-                coordinates = await geocodeCity(city);
-                // Add small delay between geocoding requests
-                if (i < cities.length - 1) {
-                  await new Promise(resolve => setTimeout(resolve, 100));
-                }
-              }
-              
-              if (coordinates) {
-                const [longitude, latitude] = coordinates;
-                
-                // Create point
-                const point = new Point({
-                  longitude: longitude,
-                  latitude: latitude
-                });
-                
-                // Create marker symbol
-                const markerSymbol = {
-                  type: "simple-marker",
-                  size: getMarkerSize(cityInfo.totalRevenue),
-                  color: getMarkerColor(cityInfo.totalRevenue),
-                  outline: {
-                    color: [255, 255, 255],
-                    width: 2
+                    category: category,
+                    categoryName: getCategoryName(category),
+                    count: catInfo.count,
+                    organizations: catInfo.orgs,
+                    totalRevenue: catInfo.totalRevenue,
+                    totalRevenueDisplay: formatRevenue(catInfo.totalRevenue)
+                  },
+                  popupTemplate: {
+                    title: "{city} - {categoryName}",
+                    content: [
+                      {
+                        type: "text",
+                        text: "{count} organizations with total funding of {totalRevenueDisplay}"
+                      }
+                    ]
                   }
-                };
-                
-                try {
-                  // Create graphic
-                  const graphic = new Graphic({
-                    geometry: point,
-                    symbol: markerSymbol,
-                    attributes: {
-                      city: city,
-                      count: cityInfo.count,
-                      organizations: cityInfo.organizations,
-                      totalRevenue: cityInfo.totalRevenue,
-                      totalRevenueDisplay: formatRevenue(cityInfo.totalRevenue)
-                    },
-                    popupTemplate: popupTemplate
+                  // Initialize the geocodeCache with combined data
+                  geocodeCache = {...cityCoordinates, ...storedGeoCache};
+                  
+                  // Updated geocodeCity function using fetch with Nominatim API
+                  async function geocodeCity(cityName, state = "CA") {
+                    // Check cache first
+                    if (geocodeCache[cityName]) {
+                      // Validate cached coordinates
+                      const coords = geocodeCache[cityName];
+                      if (isValidCaliforniaCoordinate(coords)) {
+                        debugLog(`Using cached coordinates for ${cityName}: [${coords}]`);
+                        return coords;
+                      } else {
+                        debugLog(`Found invalid cached coordinates for ${cityName}: [${coords}], re-geocoding`);
+                        // If invalid, continue to geocode
+                      }
+                    }
+                    
+                    debugLog(`Geocoding city: ${cityName}, ${state}`);
+                    
+                    try {
+                      // Use OpenStreetMap's Nominatim service
+                      const encodedCity = encodeURIComponent(cityName);
+                      const encodedState = encodeURIComponent(state);
+                      
+                      const url = `https://nominatim.openstreetmap.org/search?city=${encodedCity}&state=${encodedState}&country=USA&format=json`;
+                      
+                      // Important: Add a small delay to respect rate limits
+                      await new Promise(resolve => setTimeout(resolve, 1000));
+                      
+                      const response = await fetch(url, {
+                        headers: {
+                          // It's good practice to add a user agent when using Nominatim
+                          'User-Agent': 'CaliforniaLandConservationMap/1.0'
+                        }
+                      });
+                      
+                      if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                      }
+                      
+                      const data = await response.json();
+                      
+                      if (data && data.length > 0) {
+                        // Get longitude and latitude from first result
+                        const coords = [parseFloat(data[0].lon), parseFloat(data[0].lat)];
+                        
+                        // Validate coordinates to make sure they're in California
+                        if (isValidCaliforniaCoordinate(coords)) {
+                          debugLog(`Successfully geocoded ${cityName}: [${coords}]`);
+                          
+                          // Save to cache
+                          geocodeCache[cityName] = coords;
+                          saveGeocodeCache();
+                          
+                          return coords;
+                        } else {
+                          debugLog(`Nominatim returned coordinates outside California for ${cityName}: [${coords}]`);
+                          return null;
+                        }
+                      } else {
+                        debugLog(`No geocoding results for: ${cityName}, ${state}`);
+                        
+                        // Fallback to hardcoded coordinates if available
+                        if (cityCoordinates[cityName]) {
+                          debugLog(`Using fallback hardcoded coordinates for ${cityName}`);
+                          return cityCoordinates[cityName];
+                        }
+                        
+                        return null;
+                      }
+                    } catch (error) {
+                      debugLog(`Geocoding error for ${cityName}: ${error.message}`);
+                      
+                      // Fallback to hardcoded coordinates if available
+                      if (cityCoordinates[cityName]) {
+                        debugLog(`Using fallback hardcoded coordinates for ${cityName} after error`);
+                        return cityCoordinates[cityName];
+                      }
+                      
+                      return null;
+                    }
+                  }
+                  
+                  // Create map with basemap
+                  const map = new ArcGISMap({
+                    basemap: "topo-vector"
                   });
                   
-                  // Add to graphics layer
-                  graphicsLayer.add(graphic);
-                  markersCreated++;
+                  // Create graphics layer for organizations with explicit visibility settings
+                  graphicsLayer = new GraphicsLayer({
+                    visible: true,  // Explicitly set to visible
+                    opacity: 1,     // Full opacity
+                    title: "Organizations"  // Give it a title for easier identification
+                  });
                   
-                  if (i < 3 || i > cities.length - 4 || i === cities.length-1) {
-                    debugLog(`Added marker for ${city} with ${cityInfo.count} orgs, revenue: ${formatRevenue(cityInfo.totalRevenue)}`);
+                  // Add it to the map and ensure it's added successfully
+                  map.add(graphicsLayer);
+                  debugLog(`Added graphics layer to map: ${graphicsLayer.id}`);
+                  
+                  // Create the map view
+                  view = new MapView({
+                    container: "viewDiv",
+                    map: map,
+                    center: [-119.4179, 36.7783], // Center on California
+                    zoom: 6
+                  });
+                  
+                  // Add basemap toggle
+                  const basemapToggle = new BasemapToggle({
+                    view: view,
+                    nextBasemap: "satellite"
+                  });
+                  view.ui.add(basemapToggle, "bottom-right");
+                  
+                  // Define California extent
+                  const caExtent = new Extent({
+                    xmin: -124.4096,
+                    ymin: 32.5343,
+                    xmax: -114.1308,
+                    ymax: 42.0095,
+                    spatialReference: {
+                      wkid: 4326
+                    }
+                  });
+                  
+                  // Add home widget
+                  const homeWidget = new Home({
+                    view: view,
+                    viewpoint: {
+                      targetGeometry: caExtent
+                    }
+                  });
+                  view.ui.add(homeWidget, "top-left");
+                  
+                  // Create a popup template for marker clicks
+                  const popupTemplate = {
+                    title: "{city}",
+                    content: [
+                      {
+                        type: "text",
+                        text: "{count} organizations with total funding of {totalRevenueDisplay}"
+                      }
+                    ]
+                  };
+                  
+                  // Set up click handler for graphics
+                  view.on("click", function(event) {
+                    view.hitTest(event).then(function(response) {
+                      const graphic = response.results.find(result => {
+                        return result.graphic.layer === graphicsLayer || 
+                               Object.values(categoryGraphicsLayers).includes(result.graphic.layer);
+                      });
+                      
+                      if (graphic) {
+                        const city = graphic.graphic.attributes.city;
+                        selectedCity = city;
+                        updateInfoPanel(city);
+                      }
+                    });
+                  });
+                  
+                  // Handle file upload events
+                  document.getElementById("fileUpload").addEventListener("change", function(event) {
+                    const files = event.target.files;
+                    
+                    if (files.length === 0) return;
+                    
+                    // Add files to the uploadedFiles array
+                    for (let i = 0; i < files.length; i++) {
+                      const file = files[i];
+                      
+                      // Check if file is already in the list
+                      const exists = uploadedFiles.some(existingFile => 
+                        existingFile.name === file.name && 
+                        existingFile.size === file.size
+                      );
+                      
+                      if (!exists) {
+                        uploadedFiles.push(file);
+                        debugLog(`Added file: ${file.name} (${Math.round(file.size / 1024)} KB)`);
+                      } else {
+                        debugLog(`File already in list: ${file.name}`);
+                      }
+                    }
+                    
+                    // Update the file list display
+                    renderFileList();
+                    
+                    // Clear the file input
+                    this.value = "";
+                  });
+                  
+                  // Handle clear files button
+                  document.getElementById("clearFilesButton").addEventListener("click", function() {
+                    uploadedFiles = [];
+                    renderFileList();
+                    debugLog("Cleared all files from upload list");
+                  });
+                  
+                  // Handle upload button click
+                  document.getElementById("fileUploadButton").addEventListener("click", function() {
+                    if (uploadedFiles.length === 0) {
+                      debugLog("No files selected for upload");
+                      
+                      // Ask user if they want to use mock data
+                      if (confirm("No files selected. Use sample data instead?")) {
+                        organizations = mockOrganizations;
+                        clearMapAndReload();
+                      }
+                      return;
+                    }
+                    
+                    // Process all uploaded files
+                    processUploadedFiles();
+                  });
+                  
+                  // Handle filter buttons
+                  document.getElementById("filterAll").addEventListener("click", function() {
+                    currentFilter = 'all';
+                    setActiveFilterButton(this);
+                    filterGraphics(0);
+                    updateInfoPanel(selectedCity);
+                  });
+                  
+                  document.getElementById("filterLarge").addEventListener("click", function() {
+                    currentFilter = 'large';
+                    setActiveFilterButton(this);
+                    filterGraphics(10000000);
+                    updateInfoPanel(selectedCity);
+                  });
+                  
+                  document.getElementById("filterMed").addEventListener("click", function() {
+                    currentFilter = 'med';
+                    setActiveFilterButton(this);
+                    filterGraphics(1000000, 10000000);
+                    updateInfoPanel(selectedCity);
+                  });
+                  
+                  document.getElementById("filterSmall").addEventListener("click", function() {
+                    currentFilter = 'small';
+                    setActiveFilterButton(this);
+                    filterGraphics(0, 1000000);
+                    updateInfoPanel(selectedCity);
+                  });
+                  
+                  // Handle visualization buttons
+                  document.getElementById("showVisualizationBtn").addEventListener("click", function() {
+                    document.getElementById("fundingVisualization").style.display = "block";
+                    this.style.display = "none";
+                  });
+                  
+                  document.getElementById("hideVisualizationBtn").addEventListener("click", function() {
+                    document.getElementById("fundingVisualization").style.display = "none";
+                    document.getElementById("showVisualizationBtn").style.display = "block";
+                  });
+                  
+                  // Helper function to set active filter button
+                  function setActiveFilterButton(button) {
+                    const buttons = document.querySelectorAll(".filter-btn");
+                    buttons.forEach(btn => {
+                      btn.classList.remove("active");
+                    });
+                    button.classList.add("active");
                   }
+                  
+                  // Reset view button
+                  document.getElementById("resetViewBtn").addEventListener("click", function() {
+                    view.goTo(caExtent);
+                    selectedCity = null;
+                    updateInfoPanel();
+                  });
+                  
+                  // Reset cache button
+                  document.getElementById("resetCacheBtn").addEventListener("click", function() {
+                    if (confirm("This will reset your geocode cache. Continue?")) {
+                      if (resetGeocodeCache()) {
+                        alert("Geocache reset. Reloading the map...");
+                        location.reload();
+                      }
+                    }
+                  });
+                  
+                  // Initialize the application when view is ready
+                  view.when(function() {
+                    debugLog("Map view initialized");
+                    
+                    // Generate category legend
+                    generateCategoryLegend();
+                    
+                    // Generate category filters
+                    generateCategoryFilters();
+                    
+                    // Initialize the file list display
+                    renderFileList();
+                    
+                    // Load the default mock data initially
+                    organizations = mockOrganizations;
+                    processOrganizations().catch(error => {
+                      debugLog(`Error processing organizations: ${error.message}`);
+                    });
+                  });
                 } catch (error) {
-                  debugLog(`Error creating graphic for ${city}: ${error.message}`);
-                }
-              } else {
-                debugLog(`Could not get coordinates for city: ${city}`);
-              }
-            }
-            
-            debugLog(`Created ${markersCreated} markers out of ${cities.length} cities`);
-            debugLog(`Graphics layer has ${graphicsLayer.graphics.length} graphics`);
-            
-            // Save the complete geocode cache
-            saveGeocodeCache();
-            
-            // Check graphics layer visibility after adding markers
-            checkGraphicsLayerVisibility();
-            
-            // Update info panel
-            updateInfoPanel();
-          } catch (error) {
-            debugLog(`Error in processOrganizations: ${error.message}`);
-            console.error(error);
-          }
-        }
-        
-        // Function to render the list of uploaded files
-        function renderFileList() {
-          const fileListElement = document.getElementById("fileList");
-          fileListElement.innerHTML = "";
-          
-          if (uploadedFiles.length === 0) {
-            fileListElement.style.display = "none";
-            document.getElementById("clearFilesButton").style.display = "none";
-            return;
-          }
-          
-          fileListElement.style.display = "block";
-          document.getElementById("clearFilesButton").style.display = "block";
-          
-          uploadedFiles.forEach((file, index) => {
-            const fileItem = document.createElement("div");
-            fileItem.className = "file-item";
-            
-            const fileName = document.createElement("div");
-            fileName.className = "file-name";
-            fileName.textContent = file.name;
-            fileItem.appendChild(fileName);
-            
-            const removeButton = document.createElement("span");
-            removeButton.className = "file-action";
-            removeButton.textContent = "×";
-            removeButton.title = "Remove file";
-            removeButton.onclick = function(e) {
-              e.stopPropagation();
-              uploadedFiles.splice(index, 1);
-              renderFileList();
-            };
-            fileItem.appendChild(removeButton);
-            
-            fileListElement.appendChild(fileItem);
-          });
-        }
-        
-        // Function to process a single CSV file
-        function processCSVFile(file) {
-          return new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            
-            reader.onload = function(event) {
-              const csvContent = event.target.result;
-              
-              // Check CSV headers
-              inspectCsvHeaders(csvContent);
-              
-              // Parse CSV data
-              Papa.parse(csvContent, {
-                header: true,
-                skipEmptyLines: true,
-                complete: function(results) {
-                  if (results.errors && results.errors.length > 0) {
-                    const errorMsg = `CSV parsing errors in ${file.name}: ${results.errors[0].message}`;
-                    debugLog(errorMsg);
-                    reject(new Error(errorMsg));
-                    return;
-                  }
-                  
-                  if (!results.data || results.data.length === 0) {
-                    const errorMsg = `No data found in ${file.name}`;
-                    debugLog(errorMsg);
-                    reject(new Error(errorMsg));
-                    return;
-                  }
-                  
-                  debugLog(`Successfully parsed ${results.data.length} rows from ${file.name}`);
-                  resolve(results.data);
-                },
-                error: function(error) {
-                  debugLog(`Error parsing CSV ${file.name}: ${error}`);
-                  reject(error);
+                  debugLog(`Error initializing map: ${error.message}`);
+                  console.error(error);
                 }
               });
-            };
-            
-            reader.onerror = function() {
-              debugLog(`Error reading file ${file.name}`);
-              reject(new Error(`Error reading file ${file.name}`));
-            };
-            
-            reader.readAsText(file);
-          });
-        }
-        
-        // Function to load and process all uploaded files
-        async function processUploadedFiles() {
-          if (uploadedFiles.length === 0) {
-            debugLog("No files to process. Using mock data.");
-            organizations = mockOrganizations;
-            clearMapAndReload();
-            return;
-          }
-          
-          const fileStatus = document.getElementById("fileStatus");
-          fileStatus.textContent = `Processing ${uploadedFiles.length} file(s)...`;
-          
-          try {
-            let allOrganizations = [];
-            
-            // Process each file one by one
-            for (let i = 0; i < uploadedFiles.length; i++) {
-              const file = uploadedFiles[i];
-              debugLog(`Processing file ${i+1}/${uploadedFiles.length}: ${file.name}`);
-              
-              try {
-                const orgData = await processCSVFile(file);
-                
-                // Validate and fix organization data
-                const fixedOrgData = validateAndFixOrganizationData(orgData);
-                
-                // Add source file name for reference
-                const orgDataWithSource = fixedOrgData.map(org => ({
-                  ...org,
-                  SourceFile: file.name
-                }));
-                
-                allOrganizations = allOrganizations.concat(orgDataWithSource);
-                debugLog(`Added ${orgDataWithSource.length} organizations from ${file.name}`);
-              } catch (error) {
-                debugLog(`Error processing ${file.name}: ${error.message}`);
-              }
-            }
-            
-            if (allOrganizations.length === 0) {
-              debugLog("No valid data found in any files. Using mock data.");
-              organizations = mockOrganizations;
-            } else {
-              debugLog(`Successfully loaded ${allOrganizations.length} total organizations from ${uploadedFiles.length} files`);
-              organizations = allOrganizations;
-            }
-            
-            // Clear existing graphics
-            if (graphicsLayer) {
-              graphicsLayer.removeAll();
-              debugLog("Cleared all map markers");
-            }
-            
-            // Reset city groups
-            cityGroups = {};
-            
-            // Process the organizations data
-            await processOrganizations();
-            
-          } catch (error) {
-            debugLog(`Error processing files: ${error.message}`);
-            organizations = mockOrganizations;
-            
-            // Clear existing graphics
-            if (graphicsLayer) {
-              graphicsLayer.removeAll();
-              debugLog("Cleared all map markers");
-            }
-            
-            // Reset city groups
-            cityGroups = {};
-            
-            // Process the mock organizations data
-            await processOrganizations();
-          }
-        }
-        
-        // Clear map and reload based on CSV data
-        function clearMapAndReload() {
-          // Clear existing graphics
-          if (graphicsLayer) {
-            graphicsLayer.removeAll();
-            debugLog("Cleared all map markers");
-          }
-          
-          // Reset city groups
-          cityGroups = {};
-          
-          // Process the organizations data
-          processOrganizations().catch(error => {
-            debugLog(`Error processing organizations: ${error.message}`);
-          });
-        }
-        
-        // Add a test marker to verify the graphics layer is working
-        function addTestMarker() {
-          try {
-            debugLog("Adding test marker to verify graphics layer...");
-            const testPoint = new Point({
-              longitude: -119.0187, 
-              latitude: 35.3733
-            });
-            
-            const testGraphic = new Graphic({
-              geometry: testPoint,
-              symbol: {
-                type: "simple-marker",
-                size: 20,
-                color: [0, 0, 255, 0.8], // Blue
-                outline: {
-                  color: [255, 255, 255],
-                  width: 2
-                }
-              },
-              attributes: {
-                city: "TEST MARKER",
-                count: 1,
-                totalRevenue: 1000000,
-                totalRevenueDisplay: "$1.0M"
-              },
-              popupTemplate: popupTemplate
-            });
-            
-            graphicsLayer.add(testGraphic);
-            debugLog("Test marker added successfully");
-          } catch (error) {
-            debugLog(`Error adding test marker: ${error.message}`);
-          }
-        }
-        
-        // Set up click handler for graphics
-        view.on("click", function(event) {
-          view.hitTest(event).then(function(response) {
-            const graphic = response.results.find(result => {
-              return result.graphic.layer === graphicsLayer;
-            });
-            
-            if (graphic) {
-              const city = graphic.graphic.attributes.city;
-              selectedCity = city;
-              updateInfoPanel(city);
-            }
-          });
-        });
-        
-        // Handle file upload events
-        document.getElementById("fileUpload").addEventListener("change", function(event) {
-          const files = event.target.files;
-          
-          if (files.length === 0) return;
-          
-          // Add files to the uploadedFiles array
-          for (let i = 0; i < files.length; i++) {
-            const file = files[i];
-            
-            // Check if file is already in the list
-            const exists = uploadedFiles.some(existingFile => 
-              existingFile.name === file.name && 
-              existingFile.size === file.size
-            );
-            
-            if (!exists) {
-              uploadedFiles.push(file);
-              debugLog(`Added file: ${file.name} (${Math.round(file.size / 1024)} KB)`);
-            } else {
-              debugLog(`File already in list: ${file.name}`);
-            }
-          }
-          
-          // Update the file list display
-          renderFileList();
-          
-          // Clear the file input
-          this.value = "";
-        });
-        
-        // Handle clear files button
-        document.getElementById("clearFilesButton").addEventListener("click", function() {
-          uploadedFiles = [];
-          renderFileList();
-          debugLog("Cleared all files from upload list");
-        });
-        
-        // Handle upload button click
-        document.getElementById("fileUploadButton").addEventListener("click", function() {
-          if (uploadedFiles.length === 0) {
-            debugLog("No files selected for upload");
-            
-            // Ask user if they want to use mock data
-            if (confirm("No files selected. Use sample data instead?")) {
-              organizations = mockOrganizations;
-              clearMapAndReload();
-            }
-            return;
-          }
-          
-          // Process all uploaded files
-          processUploadedFiles();
-        });
-        
-        // Handle filter buttons
-        document.getElementById("filterAll").addEventListener("click", function() {
-          currentFilter = 'all';
-          setActiveFilterButton(this);
-          filterGraphics(0);
-          updateInfoPanel(selectedCity);
-        });
-        
-        document.getElementById("filterLarge").addEventListener("click", function() {
-          currentFilter = 'large';
-          setActiveFilterButton(this);
-          filterGraphics(10000000);
-          updateInfoPanel(selectedCity);
-        });
-        
-        document.getElementById("filterMed").addEventListener("click", function() {
-          currentFilter = 'med';
-          setActiveFilterButton(this);
-          filterGraphics(1000000, 10000000);
-          updateInfoPanel(selectedCity);
-        });
-        
-        document.getElementById("filterSmall").addEventListener("click", function() {
-          currentFilter = 'small';
-          setActiveFilterButton(this);
-          filterGraphics(0, 1000000);
-          updateInfoPanel(selectedCity);
-        });
-        
-        // Helper function to set active filter button
-        function setActiveFilterButton(button) {
-          const buttons = document.querySelectorAll(".filter-btn");
-          buttons.forEach(btn => {
-            btn.classList.remove("active");
-          });
-          button.classList.add("active");
-        }
-        
-        // Reset view button
-        document.getElementById("resetViewBtn").addEventListener("click", function() {
-          view.goTo(caExtent);
-          selectedCity = null;
-          updateInfoPanel();
-        });
-        
-        // Reset cache button
-        document.getElementById("resetCacheBtn").addEventListener("click", function() {
-          if (confirm("This will reset your geocode cache. Continue?")) {
-            if (resetGeocodeCache()) {
-              alert("Geocache reset. Reloading the map...");
-              location.reload();
-            }
-          }
-        });
-        
-        // Initialize the application when view is ready
-        view.when(function() {
-          debugLog("Map view initialized");
-          
-          // Check for invalid coordinates before processing
-          cleanupInvalidCachedCoordinates();
-          
-          // Add a test marker to verify the graphics layer is working
-          addTestMarker();
-          
-          // Initialize the file list display
-          renderFileList();
-          
-          // Load the default mock data initially
-          organizations = mockOrganizations;
-          processOrganizations().catch(error => {
-            debugLog(`Error processing organizations: ${error.message}`);
-          });
-        });
-      } catch (error) {
-        debugLog(`Error initializing map: ${error.message}`);
-        console.error(error);
-      }
-    });
-  </script>
-</body>
-</html>
+            </script>
+          </body>
+          </html>
